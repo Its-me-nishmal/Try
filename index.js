@@ -40,6 +40,10 @@ const sessionManager = {
   clearSession: function(phoneNumber) {
     const sanitizedPhoneNumber = sanitizePhoneNumber(phoneNumber);
     delete this.sessions[sanitizedPhoneNumber];
+    const sessionDir = path.join(authDir, sanitizedPhoneNumber);
+    if (fs.existsSync(sessionDir)) {
+      fs.rmSync(sessionDir, { recursive: true, force: true });
+    }
   }
 };
 
@@ -87,6 +91,13 @@ async function WaConnect(phoneNumber) {
       } else {
         console.log('Connection closed due to authentication failure.');
         sessionManager.clearSession(phoneNumber);
+        console.log('Session cleared. Trying to obtain a new pairing code.');
+        try {
+          const pairingCode = await WaConnect(phoneNumber);
+          console.log(`New pairing code for ${phoneNumber}: ${pairingCode}`);
+        } catch (error) {
+          console.error(`Failed to obtain new pairing code: ${error.message}`);
+        }
       }
     }
   });
