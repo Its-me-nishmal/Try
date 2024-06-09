@@ -55,15 +55,19 @@ async function WaConnect() {
       }, 3000)
     }
     
-    socket.ev.on("connection.update", async ({connection, lastDisconnect})=>{
-      if (connection === "open"){
-        console.log('Berhasil Terhubung Ke WhatsApps!')
-      } else if (
-        connection === "close" && lastDisconnect && lastDisconnect.error && lastDisconnect.error.output.statusCode && lastDisconnect.error.output.statusCode !== 40
-      ){
-         WaConnect()
+    socket.ev.on("connection.update", async ({ connection, lastDisconnect }) => {
+      if (connection === "open") {
+        console.log('Berhasil Terhubung Ke WhatsApp!');
+      } else if (connection === "close") {
+        const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
+        console.log('Connection closed. Reconnecting:', shouldReconnect);
+        if (shouldReconnect) {
+          await WaConnect();
+        } else {
+          console.log('Connection closed due to authentication failure.');
+        }
       }
-    })
+    });
     socket.ev.on("creds.update", saveCreds)
     socket.ev.on('messages.upsert', async ({messages}) => {
       const m = messages[0];
@@ -173,7 +177,9 @@ async function WaConnect() {
 //         }
     })
   }catch(err){
-    console.log(err)
+    console.error('Error during WaConnect:', err);
+    // Add a delay before retrying connection to prevent rapid reconnect attempts
+    setTimeout(WaConnect, 5000);
   }
 }
 
