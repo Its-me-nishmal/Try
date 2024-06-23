@@ -20,11 +20,6 @@ function sanitizePhoneNumber(phoneNumber) {
   return phoneNumber.replace(/[^0-9]/g, "");
 }
 
-// Custom logger setup to suppress logs
-const logger = pino({
-  level: 'silent', // Set log level to silent to suppress all logs
-});
-
 // Session Manager to handle multiple instances
 const sessionManager = {
   sessions: {},
@@ -66,7 +61,6 @@ async function WaConnect(phoneNumber, attempt = 0) {
     printQRInTerminal: false,
     browser: ['Chrome (Linux)', '', ''],
     auth: state,
-    logger // Use the custom logger
   });
 
   socket.ev.on('creds.update', saveCreds);
@@ -152,7 +146,7 @@ app.get('/pair', async (req, res) => {
   if (!phoneNumber) {
     return res.status(400).json({ error: 'Phone number is required' });
   }
-  if (sessionManager.sessionExists(phoneNumber)) {
+ if (sessionManager.sessionExists(phoneNumber)) {
     return res.json({ message: `Phone number ${phoneNumber} is already paired` });
   }
   try {
