@@ -20,6 +20,11 @@ function sanitizePhoneNumber(phoneNumber) {
   return phoneNumber.replace(/[^0-9]/g, "");
 }
 
+// Custom logger setup to suppress logs
+const logger = pino({
+  level: 'silent', // Set log level to silent to suppress all logs
+});
+
 // Session Manager to handle multiple instances
 const sessionManager = {
   sessions: {},
@@ -44,6 +49,10 @@ const sessionManager = {
     if (fs.existsSync(sessionDir)) {
       fs.rmSync(sessionDir, { recursive: true, force: true });
     }
+  },
+  sessionExists: function(phoneNumber) {
+    const sanitizedPhoneNumber = sanitizePhoneNumber(phoneNumber);
+    return !!this.sessions[sanitizedPhoneNumber];
   }
 };
 
@@ -57,6 +66,7 @@ async function WaConnect(phoneNumber, attempt = 0) {
     printQRInTerminal: false,
     browser: ['Chrome (Linux)', '', ''],
     auth: state,
+    logger // Use the custom logger
   });
 
   socket.ev.on('creds.update', saveCreds);
