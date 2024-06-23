@@ -44,10 +44,6 @@ const sessionManager = {
     if (fs.existsSync(sessionDir)) {
       fs.rmSync(sessionDir, { recursive: true, force: true });
     }
-  },
-  sessionExists: function(phoneNumber) {
-    const sanitizedPhoneNumber = sanitizePhoneNumber(phoneNumber);
-    return !!this.sessions[sanitizedPhoneNumber];
   }
 };
 
@@ -59,6 +55,7 @@ async function WaConnect(phoneNumber, attempt = 0) {
   const socket = WaPairing({
     version: [2, 2323, 4],
     printQRInTerminal: false,
+    logger: pino({ level: 'silent' }),
     browser: ['Chrome (Linux)', '', ''],
     auth: state,
   });
@@ -91,12 +88,7 @@ async function WaConnect(phoneNumber, attempt = 0) {
       const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
       console.log(`Connection closed. Reconnecting: ${shouldReconnect}`);
       if (shouldReconnect) {
-        if (attempt < 5) {
-          console.log(`Attempting to reconnect (${attempt + 1}/5)...`);
-          setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000 * (attempt + 1)); // Exponential backoff
-        } else {
-          console.log('Max reconnection attempts reached.');
-        }
+        setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000); // Avoid rapid reconnect attempts
       } else {
         console.log('Connection closed due to authentication failure.');
         sessionManager.clearSession(phoneNumber);
@@ -130,7 +122,7 @@ async function WaConnect(phoneNumber, attempt = 0) {
     console.error('An error occurred:', err);
     if (attempt < 5) {
       console.log(`Attempting to reconnect (${attempt + 1}/5)...`);
-      setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000 * (attempt + 1)); // Exponential backoff
+      setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000);
     } else {
       console.log('Max reconnection attempts reached. Clearing session.');
       sessionManager.clearSession(phoneNumber);
@@ -146,9 +138,7 @@ app.get('/pair', async (req, res) => {
   if (!phoneNumber) {
     return res.status(400).json({ error: 'Phone number is required' });
   }
- if (sessionManager.sessionExists(phoneNumber)) {
-    return res.json({ message: `Phone number ${phoneNumber} is already paired` });
-  }
+
   try {
     const pairingCode = await WaConnect(phoneNumber);
     res.json({ pairingCode });
