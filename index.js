@@ -55,7 +55,6 @@ async function WaConnect(phoneNumber, attempt = 0) {
   const socket = WaPairing({
     version: [2, 2323, 4],
     printQRInTerminal: false,
-    logger: pino({ level: 'info' }),
     browser: ['Chrome (Linux)', '', ''],
     auth: state,
   });
@@ -88,7 +87,20 @@ async function WaConnect(phoneNumber, attempt = 0) {
       const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
       console.log(`Connection closed. Reconnecting: ${shouldReconnect}`);
       if (shouldReconnect) {
-        setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000); // Avoid rapid reconnect attempts
+        if (attempt < 5) {
+          console.log(`Attempting to reconnect (${attempt + 1}/5)...`);
+          setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000 * (attempt + 1)); // Exponential backoff
+        } else {
+          console.log('Max reconnection attempts reached. Clearing session.');
+          sessionManager.clearSession(phoneNumber);
+          console.log('Session cleared. Trying to obtain a new pairing code.');
+          try {
+            const pairingCode = await WaConnect(phoneNumber);
+            console.log(`New pairing code for ${phoneNumber}: ${pairingCode}`);
+          } catch (error) {
+            console.error(`Failed to obtain new pairing code: ${error.message}`);
+          }
+        }
       } else {
         console.log('Connection closed due to authentication failure.');
         sessionManager.clearSession(phoneNumber);
@@ -122,7 +134,7 @@ async function WaConnect(phoneNumber, attempt = 0) {
     console.error('An error occurred:', err);
     if (attempt < 5) {
       console.log(`Attempting to reconnect (${attempt + 1}/5)...`);
-      setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000);
+      setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000 * (attempt + 1)); // Exponential backoff
     } else {
       console.log('Max reconnection attempts reached. Clearing session.');
       sessionManager.clearSession(phoneNumber);
