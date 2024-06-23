@@ -48,13 +48,14 @@ const sessionManager = {
 };
 
 // Connection function
-async function WaConnect(phoneNumber) {
+async function WaConnect(phoneNumber, attempt = 0) {
   const sanitizedPhoneNumber = sanitizePhoneNumber(phoneNumber);
   const { state, saveCreds } = await sessionManager.getSession(phoneNumber);
 
   const socket = WaPairing({
+    version: [2, 2323, 4],
     printQRInTerminal: false,
-    logger: pino({ level: 'silent' }),
+    logger: pino({ level: 'info' }),
     browser: ['Chrome (Linux)', '', ''],
     auth: state,
   });
@@ -87,7 +88,7 @@ async function WaConnect(phoneNumber) {
       const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
       console.log(`Connection closed. Reconnecting: ${shouldReconnect}`);
       if (shouldReconnect) {
-        setTimeout(() => WaConnect(phoneNumber), 5000); // Avoid rapid reconnect attempts
+        setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000); // Avoid rapid reconnect attempts
       } else {
         console.log('Connection closed due to authentication failure.');
         sessionManager.clearSession(phoneNumber);
@@ -114,6 +115,17 @@ async function WaConnect(phoneNumber) {
 
     if (msgText.toLowerCase() === 'hi') {
       socket.sendMessage(m.key.remoteJid, { text: 'hello' }, { quoted: m });
+    }
+  });
+
+  socket.ev.on('error', (err) => {
+    console.error('An error occurred:', err);
+    if (attempt < 5) {
+      console.log(`Attempting to reconnect (${attempt + 1}/5)...`);
+      setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000);
+    } else {
+      console.log('Max reconnection attempts reached. Clearing session.');
+      sessionManager.clearSession(phoneNumber);
     }
   });
 
