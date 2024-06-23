@@ -20,15 +20,6 @@ function sanitizePhoneNumber(phoneNumber) {
   return phoneNumber.replace(/[^0-9]/g, "");
 }
 
-// Silent Logger
-const silentLogger = {
-  log: () => {},
-  error: () => {},
-  info: () => {},
-  warn: () => {},
-  debug: () => {},
-};
-
 // Session Manager to handle multiple instances
 const sessionManager = {
   sessions: {},
@@ -53,10 +44,6 @@ const sessionManager = {
     if (fs.existsSync(sessionDir)) {
       fs.rmSync(sessionDir, { recursive: true, force: true });
     }
-  },
-  sessionExists: function(phoneNumber) {
-    const sanitizedPhoneNumber = sanitizePhoneNumber(phoneNumber);
-    return !!this.sessions[sanitizedPhoneNumber];
   }
 };
 
@@ -84,7 +71,7 @@ async function WaConnect(phoneNumber, attempt = 0) {
         try {
           let code = await socket.requestPairingCode(sanitizedPhoneNumber);
           code = code.match(/.{1,4}/g).join('-') || code;
-          silentLogger.log('Your Pairing Code: \n' + code);
+          console.log('Your Pairing Code: \n' + code);
           resolve(code);
         } catch (error) {
           reject(error);
@@ -95,26 +82,26 @@ async function WaConnect(phoneNumber, attempt = 0) {
 
   socket.ev.on('connection.update', async ({ connection, lastDisconnect }) => {
     if (connection === 'open') {
-      silentLogger.log(`Connected to WhatsApp for ${phoneNumber} successfully!`);
+      console.log(`Connected to WhatsApp for ${phoneNumber} successfully!`);
     } else if (connection === 'close') {
       const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
-      silentLogger.log(`Connection closed. Reconnecting: ${shouldReconnect}`);
+      console.log(`Connection closed. Reconnecting: ${shouldReconnect}`);
       if (shouldReconnect) {
         if (attempt < 5) {
-          silentLogger.log(`Attempting to reconnect (${attempt + 1}/5)...`);
+          console.log(`Attempting to reconnect (${attempt + 1}/5)...`);
           setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000 * (attempt + 1)); // Exponential backoff
         } else {
-          silentLogger.log('Max reconnection attempts reached.');
+          console.log('Max reconnection attempts reached.');
         }
       } else {
-        silentLogger.log('Connection closed due to authentication failure.');
+        console.log('Connection closed due to authentication failure.');
         sessionManager.clearSession(phoneNumber);
-        silentLogger.log('Session cleared. Trying to obtain a new pairing code.');
+        console.log('Session cleared. Trying to obtain a new pairing code.');
         try {
           const pairingCode = await WaConnect(phoneNumber);
-          silentLogger.log(`New pairing code for ${phoneNumber}: ${pairingCode}`);
+          console.log(`New pairing code for ${phoneNumber}: ${pairingCode}`);
         } catch (error) {
-          silentLogger.error(`Failed to obtain new pairing code: ${error.message}`);
+          console.error(`Failed to obtain new pairing code: ${error.message}`);
         }
       }
     }
@@ -136,12 +123,12 @@ async function WaConnect(phoneNumber, attempt = 0) {
   });
 
   socket.ev.on('error', (err) => {
-    silentLogger.error('An error occurred:', err);
+    console.error('An error occurred:', err);
     if (attempt < 5) {
-      silentLogger.log(`Attempting to reconnect (${attempt + 1}/5)...`);
+      console.log(`Attempting to reconnect (${attempt + 1}/5)...`);
       setTimeout(() => WaConnect(phoneNumber, attempt + 1), 5000 * (attempt + 1)); // Exponential backoff
     } else {
-      silentLogger.log('Max reconnection attempts reached. Clearing session.');
+      console.log('Max reconnection attempts reached. Clearing session.');
       sessionManager.clearSession(phoneNumber);
     }
   });
@@ -155,11 +142,9 @@ app.get('/pair', async (req, res) => {
   if (!phoneNumber) {
     return res.status(400).json({ error: 'Phone number is required' });
   }
-
   if (sessionManager.sessionExists(phoneNumber)) {
     return res.json({ message: `Phone number ${phoneNumber} is already paired` });
   }
-
   try {
     const pairingCode = await WaConnect(phoneNumber);
     res.json({ pairingCode });
