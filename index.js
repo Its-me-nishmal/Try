@@ -58,6 +58,9 @@ async function WaConnect(phoneNumber, attempt = 0) {
     logger: pino({ level: 'silent' }),
     browser: ['Chrome (Linux)', '', ''],
     auth: state,
+    syncFullHistory: false,
+    keepAliveIntervalMs: 15000,
+markOnlineOnConnect: true,
   });
 
   socket.ev.on('creds.update', saveCreds);
@@ -142,6 +145,22 @@ app.get('/pair', async (req, res) => {
   try {
     const pairingCode = await WaConnect(phoneNumber);
     res.json({ pairingCode });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Express route to send a message
+app.get('/send', async (req, res) => {
+  const { from, to, message } = req.query;
+  if (!from || !to || !message) {
+    return res.status(400).json({ error: 'From, to, and message parameters are required' });
+  }
+
+  try {
+    const fromSocket = await WaConnect(from);
+    await fromSocket.sendMessage(sanitizePhoneNumber(to)+'@s.whatsapp.net', { text: message });
+    res.json({ success: true, message: 'Message sent successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
