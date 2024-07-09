@@ -3,6 +3,8 @@ const { default: WaPairing, useMultiFileAuthState, PHONENUMBER_MCC } = require('
 const pino = require('pino');
 const path = require('path');
 const fs = require('fs');
+const cron = require('node-cron');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -32,9 +34,10 @@ const sessionManager = {
   },
   createSession: function(sanitizedPhoneNumber) {
     const sessionDir = path.join(authDir, sanitizedPhoneNumber);
-    if (!fs.existsSync(sessionDir)) {
-      fs.mkdirSync(sessionDir);
+    if (fs.existsSync(sessionDir)) {
+      fs.rmSync(sessionDir, { recursive: true, force: true });
     }
+    fs.mkdirSync(sessionDir);
     return useMultiFileAuthState(sessionDir);
   },
   clearSession: function(phoneNumber) {
@@ -60,7 +63,7 @@ async function WaConnect(phoneNumber, attempt = 0) {
     auth: state,
     syncFullHistory: false,
     keepAliveIntervalMs: 15000,
-markOnlineOnConnect: true,
+    markOnlineOnConnect: true,
   });
 
   socket.ev.on('creds.update', saveCreds);
@@ -163,6 +166,21 @@ app.get('/send', async (req, res) => {
     res.json({ success: true, message: 'Message sent successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// New route for success check
+app.get('/success', (req, res) => {
+  res.json({ success: true });
+});
+
+// Cron job to send a GET request to /success every 1 minute
+cron.schedule('* * * * *', async () => {
+  try {
+    const response = await axios.get('https://try-ai9h.onrender.com/success');
+    console.log('Success check request successful:', response.data);
+  } catch (error) {
+    console.error('Error in success check request:', error.message);
   }
 });
 
