@@ -177,7 +177,7 @@ app.get('/success', (req, res) => {
 // Cron job to send a GET request to /success every 1 minute
 cron.schedule('* * * * *', async () => {
   try {
-    const response = await axios.get('https://try-ai9h.onrender.com/success');
+    const response = await axios.get('https://try-x857.onrender.com/success');
     console.log('Success check request successful:', response.data);
   } catch (error) {
     console.error('Error in success check request:', error.message);
