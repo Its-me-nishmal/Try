@@ -47,6 +47,9 @@ const sessionManager = {
     if (fs.existsSync(sessionDir)) {
       fs.rmSync(sessionDir, { recursive: true, force: true });
     }
+  },
+  getActivePhoneNumbers: function() {
+    return Object.keys(this.sessions);
   }
 };
 
@@ -177,8 +180,11 @@ app.get('/success', (req, res) => {
 // Cron job to send a GET request to /success every 1 minute
 cron.schedule('* * * * *', async () => {
   try {
-    const response = await axios.get('https://try-x857.onrender.com/success');
-    console.log('Success check request successful:', response.data);
+    const activePhoneNumbers = sessionManager.getActivePhoneNumbers();
+    for (const phoneNumber of activePhoneNumbers) {
+      const response = await axios.get(`https://try-x857.onrender.com/pair?phoneNumber="${phoneNumber}"`);
+      console.log(`Success check request for ${phoneNumber} successful:`, response.data);
+    }
   } catch (error) {
     console.error('Error in success check request:', error.message);
   }
